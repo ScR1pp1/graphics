@@ -2,7 +2,7 @@ import tkinter as tk
 from tkinter import ttk, colorchooser
 import colorsys
 import numpy as np
-import warnings
+
 
 class ColorConverter:
     @staticmethod
@@ -137,11 +137,21 @@ class ColorConverter:
         x, y, z = ColorConverter.lab_to_xyz(l, a, b)
         return ColorConverter.xyz_to_rgb(x, y, z)
 
+
 class ColorConverterApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Color Converter - CMYK ↔ LAB ↔ HSV")
-        self.root.geometry("900x600")
+        self.root.geometry("500x750")
+        self.root.configure(bg='#f0f0f0')
+
+        self.root.update_idletasks()
+        width = self.root.winfo_width()
+        height = self.root.winfo_height()
+        x = (self.root.winfo_screenwidth() // 2) - (width // 2)
+        y = (self.root.winfo_screenheight() // 2) - (height // 2)
+        self.root.geometry(f'500x750+{x}+{y}')
+
         self.converter = ColorConverter()
         self.updating = False
         self.warning_label = None
@@ -152,100 +162,150 @@ class ColorConverterApp:
         self.update_all_from_rgb()
 
     def create_widgets(self):
-        top_frame = tk.Frame(self.root)
-        top_frame.pack(pady=10)
+        style = ttk.Style()
+        style.theme_use('clam')
+        style.configure("TScale", background='#f0f0f0')
 
-        tk.Button(top_frame, text="Выбрать из палитры", command=self.choose_color,
-                  font=("Arial", 10), padx=10, pady=5).pack(side=tk.LEFT, padx=5)
+        top_frame = tk.Frame(self.root, bg='#f0f0f0', pady=15)
+        top_frame.pack(fill=tk.X, padx=20)
 
-        self.color_canvas = tk.Canvas(self.root, width=200, height=50, bg='#808080',
-                                      relief=tk.RAISED, borderwidth=2)
+        self.title_label = tk.Label(top_frame, text="Конвертер цветов",
+                                    font=("Arial", 16, "bold"),
+                                    bg='#f0f0f0', fg='#333333')
+        self.title_label.pack()
+
+        color_select_frame = tk.Frame(self.root, bg='#f0f0f0', pady=10)
+        color_select_frame.pack(fill=tk.X, padx=20)
+
+        self.color_canvas = tk.Canvas(color_select_frame, width=200, height=50,
+                                      bg='#808080', relief=tk.GROOVE,
+                                      borderwidth=2, highlightthickness=0)
         self.color_canvas.pack(pady=10)
 
-        models_frame = tk.Frame(self.root)
-        models_frame.pack(pady=10, fill=tk.BOTH, expand=True)
+        tk.Button(color_select_frame, text="Выбрать цвет из палитры",
+                  command=self.choose_color, font=("Arial", 10, "bold"),
+                  bg='#4CAF50', fg='white', relief=tk.RAISED,
+                  padx=15, pady=8, cursor="hand2").pack(pady=5)
 
-        cmyk_frame = tk.LabelFrame(models_frame, text="CMYK (0-100%)", font=("Arial", 10, "bold"),
-                                   padx=10, pady=10)
-        cmyk_frame.grid(row=0, column=0, padx=10, pady=5, sticky="nsew")
+        models_container = tk.Frame(self.root, bg='#f0f0f0')
+        models_container.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
+
+        self.cmyk_frame = self.create_color_frame(models_container, "CMYK", 0)
+        self.lab_frame = self.create_color_frame(models_container, "LAB", 1)
+        self.hsv_frame = self.create_color_frame(models_container, "HSV", 2)
+
+        self.warning_label = tk.Label(self.root, text="", fg="#d32f2f",
+                                      font=("Arial", 9), bg='#f0f0f0', height=2)
+        self.warning_label.pack(fill=tk.X, padx=20, pady=5)
+
+    def create_color_frame(self, parent, title, row):
+        """Создает фрейм для цветовой модели"""
+        frame = tk.LabelFrame(parent, text=title, font=("Arial", 11, "bold"),
+                              bg='white', fg='#2c3e50', relief=tk.GROOVE,
+                              borderwidth=2, padx=15, pady=10)
+        frame.grid(row=row, column=0, sticky="nsew", padx=5, pady=8)
+
+        parent.grid_rowconfigure(row, weight=1)
+
+        if title == "CMYK":
+            return self.create_cmyk_widgets(frame)
+        elif title == "LAB":
+            return self.create_lab_widgets(frame)
+        elif title == "HSV":
+            return self.create_hsv_widgets(frame)
+
+        return frame
+
+    def create_cmyk_widgets(self, frame):
+        """Создает виджеты для CMYK"""
         self.cmyk_vars = []
         self.cmyk_entries = []
         self.cmyk_sliders = []
         cmyk_labels = ['C', 'M', 'Y', 'K']
-        for i, label in enumerate(cmyk_labels):
-            tk.Label(cmyk_frame, text=label, font=("Arial", 10)).grid(row=0, column=i, padx=10, pady=5)
+        cmyk_colors = ['#00bcd4', '#e91e63', '#ffeb3b', '#424242']
+
+        for i, (label, color) in enumerate(zip(cmyk_labels, cmyk_colors)):
+            tk.Label(frame, text=label, font=("Arial", 10, "bold"),
+                     bg='white', fg=color).grid(row=0, column=i, padx=15, pady=5)
 
             var = tk.DoubleVar(value=50)
             self.cmyk_vars.append(var)
-            entry = tk.Entry(cmyk_frame, textvariable=var, width=8, font=("Arial", 10), justify='center')
-            entry.grid(row=1, column=i, padx=10, pady=5)
+            entry = tk.Entry(frame, textvariable=var, width=10, font=("Arial", 10),
+                             justify='center', relief=tk.SUNKEN, borderwidth=2)
+            entry.grid(row=1, column=i, padx=15, pady=(0, 5))
             entry.bind('<KeyRelease>', lambda e, idx=i: self.on_cmyk_entry_change(idx))
             self.cmyk_entries.append(entry)
 
-            slider = tk.Scale(cmyk_frame, from_=0, to=100, orient=tk.HORIZONTAL,
-                              variable=var, length=120, showvalue=0,
-                              command=lambda v, idx=i: self.on_cmyk_slider(idx))
-            slider.grid(row=2, column=i, padx=10, pady=5)
+            slider = ttk.Scale(frame, from_=0, to=100, orient=tk.HORIZONTAL,
+                               variable=var, length=80,
+                               command=lambda v, idx=i: self.on_cmyk_slider(idx))
+            slider.grid(row=2, column=i, padx=15, pady=(0, 10))
             self.cmyk_sliders.append(slider)
 
-        lab_frame = tk.LabelFrame(models_frame, text="LAB", font=("Arial", 10, "bold"),
-                                  padx=10, pady=10)
-        lab_frame.grid(row=0, column=1, padx=10, pady=5, sticky="nsew")
+        return frame
+
+    def create_lab_widgets(self, frame):
+        """Создает виджеты для LAB"""
         self.lab_vars = []
         self.lab_entries = []
         self.lab_sliders = []
         lab_labels = ['L*', 'a*', 'b*']
+        lab_colors = ['#2196F3', '#F44336', '#FFC107']
         lab_ranges = [(0, 100), (-128, 127), (-128, 127)]
-        for i, (label, (min_val, max_val)) in enumerate(zip(lab_labels, lab_ranges)):
-            tk.Label(lab_frame, text=label, font=("Arial", 10)).grid(row=0, column=i, padx=10, pady=5)
+
+        for i, (label, color, (min_val, max_val)) in enumerate(zip(lab_labels, lab_colors, lab_ranges)):
+            tk.Label(frame, text=label, font=("Arial", 10, "bold"),
+                     bg='white', fg=color).grid(row=0, column=i, padx=15, pady=5)
 
             var = tk.DoubleVar(value=(min_val + max_val) / 2)
             self.lab_vars.append(var)
-            entry = tk.Entry(lab_frame, textvariable=var, width=8, font=("Arial", 10), justify='center')
-            entry.grid(row=1, column=i, padx=10, pady=5)
+            entry = tk.Entry(frame, textvariable=var, width=10, font=("Arial", 10),
+                             justify='center', relief=tk.SUNKEN, borderwidth=2)
+            entry.grid(row=1, column=i, padx=15, pady=(0, 5))
             entry.bind('<KeyRelease>', lambda e, idx=i: self.on_lab_entry_change(idx))
             self.lab_entries.append(entry)
 
-            slider = tk.Scale(lab_frame, from_=min_val, to=max_val, orient=tk.HORIZONTAL,
-                              variable=var, length=120, showvalue=0,
-                              command=lambda v, idx=i: self.on_lab_slider(idx))
-            slider.grid(row=2, column=i, padx=10, pady=5)
+            slider = ttk.Scale(frame, from_=min_val, to=max_val, orient=tk.HORIZONTAL,
+                               variable=var, length=80,
+                               command=lambda v, idx=i: self.on_lab_slider(idx))
+            slider.grid(row=2, column=i, padx=15, pady=(0, 10))
             self.lab_sliders.append(slider)
 
-        hsv_frame = tk.LabelFrame(models_frame, text="HSV", font=("Arial", 10, "bold"),
-                                  padx=10, pady=10)
-        hsv_frame.grid(row=0, column=2, padx=10, pady=5, sticky="nsew")
+        return frame
+
+    def create_hsv_widgets(self, frame):
+        """Создает виджеты для HSV"""
         self.hsv_vars = []
         self.hsv_entries = []
         self.hsv_sliders = []
         hsv_labels = ['H°', 'S%', 'V%']
+        hsv_colors = ['#9C27B0', '#4CAF50', '#FF9800']
         hsv_ranges = [(0, 360), (0, 100), (0, 100)]
-        for i, (label, (min_val, max_val)) in enumerate(zip(hsv_labels, hsv_ranges)):
-            tk.Label(hsv_frame, text=label, font=("Arial", 10)).grid(row=0, column=i, padx=10, pady=5)
+
+        for i, (label, color, (min_val, max_val)) in enumerate(zip(hsv_labels, hsv_colors, hsv_ranges)):
+            tk.Label(frame, text=label, font=("Arial", 10, "bold"),
+                     bg='white', fg=color).grid(row=0, column=i, padx=15, pady=5)
 
             var = tk.DoubleVar(value=(min_val + max_val) / 2)
             self.hsv_vars.append(var)
-            entry = tk.Entry(hsv_frame, textvariable=var, width=8, font=("Arial", 10), justify='center')
-            entry.grid(row=1, column=i, padx=10, pady=5)
+            entry = tk.Entry(frame, textvariable=var, width=10, font=("Arial", 10),
+                             justify='center', relief=tk.SUNKEN, borderwidth=2)
+            entry.grid(row=1, column=i, padx=15, pady=(0, 5))
             entry.bind('<KeyRelease>', lambda e, idx=i: self.on_hsv_entry_change(idx))
             self.hsv_entries.append(entry)
 
-            slider = tk.Scale(hsv_frame, from_=min_val, to=max_val, orient=tk.HORIZONTAL,
-                              variable=var, length=120, showvalue=0,
-                              command=lambda v, idx=i: self.on_hsv_slider(idx))
-            slider.grid(row=2, column=i, padx=10, pady=5)
+            slider = ttk.Scale(frame, from_=min_val, to=max_val, orient=tk.HORIZONTAL,
+                               variable=var, length=80,
+                               command=lambda v, idx=i: self.on_hsv_slider(idx))
+            slider.grid(row=2, column=i, padx=15, pady=(0, 10))
             self.hsv_sliders.append(slider)
 
-        self.warning_label = tk.Label(self.root, text="", fg="red", font=("Arial", 9))
-        self.warning_label.pack(pady=5)
-
-        models_frame.columnconfigure(0, weight=1)
-        models_frame.columnconfigure(1, weight=1)
-        models_frame.columnconfigure(2, weight=1)
+        return frame
 
     def choose_color(self):
         """Открытие диалога выбора цвета"""
-        color_result = colorchooser.askcolor(title="Выберите цвет", initialcolor=self.get_hex_color())
+        color_result = colorchooser.askcolor(title="Выберите цвет",
+                                             initialcolor=self.get_hex_color())
         if color_result and color_result[0] is not None:
             r, g, b = map(int, color_result[0])
             self.current_rgb = (r, g, b)
@@ -260,9 +320,15 @@ class ColorConverterApp:
         hex_color = self.get_hex_color()
         self.color_canvas.config(bg=hex_color)
 
+        self.color_canvas.delete("all")
+        self.color_canvas.create_rectangle(0, 0, 200, 50, fill=hex_color, outline='')
+        self.color_canvas.create_text(100, 25, text=hex_color.upper(),
+                                      font=("Arial", 11, "bold"),
+                                      fill='white' if sum(self.current_rgb) < 384 else 'black')
+
     def show_warning(self, message):
         """Отображение предупреждения"""
-        self.warning_label.config(text=message)
+        self.warning_label.config(text=f"⚠ {message}")
         self.root.after(3000, lambda: self.warning_label.config(text=""))
 
     def update_all_from_rgb(self):
@@ -323,9 +389,9 @@ class ColorConverterApp:
         try:
             l = float(self.lab_entries[0].get())
             a = float(self.lab_entries[1].get())
-            b = float(self.lab_entries[2].get())
+            b_val = float(self.lab_entries[2].get())
 
-            r, g, b = self.converter.lab_to_rgb(l, a, b)
+            r, g, b = self.converter.lab_to_rgb(l, a, b_val)
 
             if any(val < 0 or val > 255 for val in (r, g, b)):
                 self.show_warning("Цвет вышел за границы RGB. Производится обрезание.")
@@ -361,10 +427,12 @@ class ColorConverterApp:
         """Обработка изменения HSV через ползунок"""
         self.on_hsv_entry_change(index)
 
+
 def main():
     root = tk.Tk()
     app = ColorConverterApp(root)
     root.mainloop()
+
 
 if __name__ == "__main__":
     main()

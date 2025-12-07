@@ -32,9 +32,13 @@ class ImageAnalyzerApp:
                bg='#4CAF50', fg='black', font=('Arial', 10, 'bold'),
                width=15, height=1, relief=RAISED, bd=2).place(x=10, y=15)
 
+        Button(control_frame, text="Выбрать файлы", command=self.select_files,
+               bg='#2196F3', fg='black', font=('Arial', 10, 'bold'),
+               width=15, height=1, relief=RAISED, bd=2).place(x=160, y=15)
+
         self.folder_label = Label(control_frame, text="Папка не выбрана",
                                   bg='#333333', fg='white', font=('Arial', 10))
-        self.folder_label.place(x=150, y=20)
+        self.folder_label.place(x=310, y=20)
 
         self.status_label = Label(control_frame, text="Готов",
                                   bg='#333333', fg='white', font=('Arial', 10))
@@ -110,6 +114,7 @@ class ImageAnalyzerApp:
         self.stats_label.place(x=900, y=20)
 
     def select_folder(self):
+        """Выбор папки с изображениями"""
         if self.processing:
             messagebox.showwarning("Внимание", "Дождитесь завершения обработки текущих файлов")
             return
@@ -120,7 +125,33 @@ class ImageAnalyzerApp:
             self.folder_label.config(text=f"Папка: {os.path.basename(folder)}")
             self.scan_folder(folder)
 
+    def select_files(self):
+        """Выбор одного или нескольких файлов"""
+        if self.processing:
+            messagebox.showwarning("Внимание", "Дождитесь завершения обработки текущих файлов")
+            return
+
+        file_types = [
+            ("Изображения", "*.jpg *.jpeg *.gif *.tif *.tiff *.bmp *.png *.pcx"),
+            ("Все файлы", "*.*")
+        ]
+
+        files = filedialog.askopenfilenames(
+            title="Выберите файлы изображений",
+            filetypes=file_types
+        )
+
+        if files:
+            self.files = list(files)
+            if len(files) == 1:
+                self.folder_label.config(text=f"Файл: {os.path.basename(files[0])}")
+            else:
+                self.folder_label.config(text=f"Выбрано файлов: {len(files)}")
+
+            self.start_processing()
+
     def scan_folder(self, folder):
+        """Сканирование папки для поиска изображений"""
         self.files = []
         supported_extensions = {'.jpg', '.jpeg', '.gif', '.tif', '.tiff', '.bmp', '.png', '.pcx'}
 
@@ -137,6 +168,10 @@ class ImageAnalyzerApp:
             messagebox.showinfo("Информация", "В выбранной папке не найдены графические файлы")
             return
 
+        self.start_processing()
+
+    def start_processing(self):
+        """Начало обработки выбранных файлов"""
         self.processing = True
         self.status_label.config(text="Обработка...")
         self.progress['maximum'] = len(self.files)
@@ -147,6 +182,7 @@ class ImageAnalyzerApp:
         thread.start()
 
     def process_files(self):
+        """Обработка файлов в отдельном потоке"""
         self.tree.delete(*self.tree.get_children())
 
         for i, file_path in enumerate(self.files):
@@ -163,6 +199,7 @@ class ImageAnalyzerApp:
         self.root.after(0, self.finish_processing)
 
     def get_image_info(self, file_path):
+        """Получение информации об изображении"""
         info = {
             'filename': os.path.basename(file_path),
             'format': Path(file_path).suffix.upper()[1:],
@@ -192,6 +229,7 @@ class ImageAnalyzerApp:
         return info
 
     def get_color_depth(self, img):
+        """Определение глубины цвета"""
         mode_to_depth = {
             '1': 1, 'L': 8, 'P': 8, 'RGB': 24, 'RGBA': 32,
             'CMYK': 32, 'YCbCr': 24, 'I': 32, 'F': 32
@@ -203,6 +241,7 @@ class ImageAnalyzerApp:
         return depth
 
     def get_compression_info(self, img, file_path):
+        """Определение типа сжатия"""
         ext = Path(file_path).suffix.lower()
 
         if ext in ['.jpg', '.jpeg']:
@@ -244,6 +283,7 @@ class ImageAnalyzerApp:
         return "Неизвестно"
 
     def get_additional_info(self, img, file_path):
+        """Получение дополнительной информации об изображении"""
         details = {}
         ext = Path(file_path).suffix.lower()
 
@@ -300,6 +340,7 @@ class ImageAnalyzerApp:
         return details
 
     def add_to_tree(self, file_path, info):
+        """Добавление файла в дерево"""
         self.tree.insert('', 'end', values=(
             info['filename'],
             info['format'],
@@ -310,15 +351,18 @@ class ImageAnalyzerApp:
         ), tags=(file_path,))
 
     def update_progress(self, value):
+        """Обновление прогресс-бара"""
         self.progress['value'] = value
         self.stats_label.config(text=f"Файлов: {value}/{len(self.files)}")
 
     def finish_processing(self):
+        """Завершение обработки"""
         self.processing = False
         self.status_label.config(text="Готов")
         messagebox.showinfo("Завершено", f"Обработано {len(self.files)} файлов")
 
     def show_details(self, event):
+        """Отображение детальной информации о выбранном файле"""
         selection = self.tree.selection()
         if not selection:
             return
@@ -361,6 +405,7 @@ class ImageAnalyzerApp:
             self.detail_text.insert(END, f"Ошибка: {str(e)}")
 
     def export_csv(self):
+        """Экспорт данных в CSV файл"""
         if not self.files:
             messagebox.showwarning("Внимание", "Нет данных для экспорта")
             return
@@ -386,6 +431,7 @@ class ImageAnalyzerApp:
                 messagebox.showerror("Ошибка", f"Не удалось экспортировать: {str(e)}")
 
     def clear_results(self):
+        """Очистка всех результатов"""
         if self.processing:
             messagebox.showwarning("Внимание", "Дождитесь завершения обработки")
             return
@@ -399,6 +445,7 @@ class ImageAnalyzerApp:
             self.progress['value'] = 0
 
     def show_help(self):
+        """Отображение справки"""
         help_text = """ПРИЛОЖЕНИЕ ДЛЯ АНАЛИЗА ГРАФИЧЕСКИХ ФАЙЛОВ
 
 Возможности:
@@ -417,8 +464,8 @@ class ImageAnalyzerApp:
 5. Экспорт результатов в CSV
 
 Инструкция:
-1. Нажмите "Выбрать папку"
-2. Выберите папку с изображениями
+1. Нажмите "Выбрать папку" для анализа всех изображений в папке
+2. ИЛИ нажмите "Выбрать файлы" для выбора отдельных файлов
 3. Дождитесь завершения обработки
 4. Выберите файл в таблице для просмотра деталей
 
